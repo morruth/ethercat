@@ -3,6 +3,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include <net/ethernet.h>
+
+char *hexdump(void *,int);
+
 /*
  * Convert an ASCII representation of an ethernet address to  binary form.
  */
@@ -40,4 +43,49 @@ char *ether_ntoa(const struct ether_addr *binaddr) {
         if (printcount < 17)
                 return (NULL);
         return ((char *)&straddr);
+}
+
+int ismymac( const unsigned char *mac){
+    /* STUB FIXME */
+    return 1;
+}
+
+int maceq(const void *mac1, const void *mac2){
+    unsigned char *bytep1=(unsigned char*)mac1,*bytep2=(unsigned char *)mac2;
+    for(;*bytep1 == *bytep2 && (void *)bytep1-mac1 < ETH_ALEN ; bytep1++){
+	bytep2++;
+    }
+    return (bytep1 != mac1);
+}
+
+char *dumppacket( void *packet, int packet_len){
+    static char printbuf[4096]; /* size of buffer enougth? */
+    struct ether_header *eh=(struct ether_header*)packet;
+    unsigned char *packet_data;
+
+    sprintf(printbuf,"%s -> %s, type: %02x \n%s",ether_ntoa(eh->ether_shost),ether_ntoa(eh->ether_dhost), eh->ether_type, hexdump(packet+ETHER_HDR_LEN,
+	    packet_len - ETHER_HDR_LEN));
+    return printbuf;
+}
+
+#define BYTESPERLINE 32
+
+char *hexdump( void *data, int datalen){
+    u_int8_t *wdata=(u_int8_t *)data;
+    static char buffer[ETHERMTU*2 + ETHERMTU/BYTESPERLINE+1];
+    int i,j=0,bufidx=0;
+
+    if(datalen> ETHERMTU){
+	return NULL;
+    }
+    for(i=0;i<datalen;i++){
+	j++;
+	if(j>BYTESPERLINE){
+	    j=0;
+	    /*add newline */
+	    buffer[bufidx++]=(char)'\n';
+	}
+	bufidx+=sprintf(buffer+bufidx,"%02x",wdata[i]);
+    }
+    return buffer;
 }
