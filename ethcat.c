@@ -127,8 +127,12 @@ int main(int argc, char *argv[]){
 		/* Child, receiver */
 		ssize_t datalen;
 		while( datalen= recv(sockfd,packet_buffer,ETH_DATA_LEN,0)){
+			if(eh->ether_type==htons(ether_type)){
 			/* need checking of address FIXME */
-			write(STDIN_FILENO,packet_data,datalen);
+				if(ismymac(eh->ether_dhost)&& maceq(eh->ether_shost,other_mac)){
+					write(STDIN_FILENO,packet_data,datalen);
+				}
+			}
 		}
 	}else if (pid == -1) {
 		/* parent, error */	
