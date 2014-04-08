@@ -127,6 +127,9 @@ int main(int argc, char *argv[]){
 		/* Child, receiver */
 		ssize_t datalen;
 		while( datalen= recv(sockfd,packet_buffer,ETH_DATA_LEN,0)){
+			if(verbose){
+			    printf("%s",dumppacket(packet_buffer,datalen));
+			}
 			if(eh->ether_type==htons(ether_type)){
 			/* need checking of address FIXME */
 				if(ismymac(eh->ether_dhost)&& maceq(eh->ether_shost,other_mac)){

@@ -22,3 +22,4 @@ struct ether_addr *ether_aton(const char *);
  */
 
 char *ether_ntoa(const struct ether_addr *);
+char *dumppacket( void *, int );
