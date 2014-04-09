@@ -63,7 +63,7 @@ char *dumppacket( void *packet, int packet_len){
     struct ether_header *eh=(struct ether_header*)packet;
     unsigned char *packet_data;
 
-    sprintf(printbuf,"%s -> %s, type: %02x \n%s",ether_ntoa(eh->ether_shost),ether_ntoa(eh->ether_dhost), ntohs(eh->ether_type), hexdump(packet+ETHER_HDR_LEN,
+    sprintf(printbuf,"%s -> %s, type: %02x length: %hd\n%s",ether_ntoa(eh->ether_shost),ether_ntoa(eh->ether_dhost), ntohs(eh->ether_type),ntohs(*(u_int16_t *)(packet+ETHER_HDR_LEN)), hexdump(packet+ETHER_HDR_LEN+sizeof(u_int16_t),
 	    packet_len - ETHER_HDR_LEN));
     return printbuf;
 }
