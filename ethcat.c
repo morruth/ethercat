@@ -141,7 +141,7 @@ int main(int argc, char *argv[]){
 			if(eh->ether_type==htons(ether_type)){
 			/* need checking of address FIXME */
 				if(ismymac(eh->ether_dhost)&& maceq(eh->ether_shost,other_mac)){
-					write(STDIN_FILENO,packet_data,*pdata_len);
+					write(STDIN_FILENO,packet_data,ntohs(*pdata_len));
 				}
 			}
 		}
