@@ -4,8 +4,10 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <unistd.h>
 #include <signal.h>
 #include "ether.h"
+
 
 void print_help(char *);
 
@@ -20,7 +22,9 @@ int main(int argc, char *argv[]){
 	int verbose = 0;
 	int sockfd;
 	char packet_buffer[ETHER_MAX_LEN+1];
-	char *packet_data=packet_buffer+sizeof(struct ether_header);
+	
+	char *packet_data=packet_buffer+sizeof(struct ether_header)+sizeof(u_int16_t);
+	u_int16_t *pdata_len=packet_buffer+sizeof(struct ether_header);
 	struct ether_header *eh=(struct ether_header *) packet_buffer;
 	struct ether_addr *other_mac=NULL;
 	pid_t pid=0;
@@ -79,7 +83,7 @@ int main(int argc, char *argv[]){
 	}
 
         /* Open RAW socket to send on */
-        if ((sockfd = socket(AF_PACKET, SOCK_RAW, IPPROTO_RAW)) == -1) {
+        if ((sockfd = socket(AF_PACKET, SOCK_RAW, htons(ether_type))) == -1) {
             perror("socket");
 	    exit(4);
         }
@@ -125,15 +129,19 @@ int main(int argc, char *argv[]){
 	pid=fork();
 	if(pid == 0 ){
 		/* Child, receiver */
+	    if(verbose){
+	        dprintf(STDERR_FILENO,"Start receider thread %d",getpid());
+	    }
+
 		ssize_t datalen;
-		while( datalen= recv(sockfd,packet_buffer,ETH_DATA_LEN,0)){
+		while( datalen= recvfrom(sockfd,packet_buffer,ETH_DATA_LEN,0,NULL,NULL)){
 			if(verbose){
-			    printf("%s",dumppacket(packet_buffer,datalen));
+			    dprintf(STDERR_FILENO,"%s",dumppacket(packet_buffer,datalen));
 			}
 			if(eh->ether_type==htons(ether_type)){
 			/* need checking of address FIXME */
 				if(ismymac(eh->ether_dhost)&& maceq(eh->ether_shost,other_mac)){
-					write(STDIN_FILENO,packet_data,datalen);
+					write(STDIN_FILENO,packet_data,*pdata_len);
 				}
 			}
 		}
@@ -144,13 +152,15 @@ int main(int argc, char *argv[]){
 	}else{
 		/*parent, fork ok, sender*/
 		ssize_t datalen;
+		
 		/*read data from stdin*/
-		while( datalen=read(STDIN_FILENO,packet_data,ETH_DATA_LEN)){
+		while( datalen=read(STDIN_FILENO,packet_data,ETH_DATA_LEN-sizeof(u_int16_t))){
 			if(datalen== -1 ){
 				perror("I/O error from stdin");
 			}else{
 			/*send to network*/
-				if (sendto(sockfd, packet_buffer, sizeof(struct ether_header)+datalen, 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll)) < 0)
+				*pdata_len=htons(datalen);
+				if (sendto(sockfd, packet_buffer, sizeof(struct ether_header)+sizeof(u_int16_t)+datalen, 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll)) < 0)
 				    printf("Send failed\n");
 			}
 		}
