@@ -35,6 +35,7 @@ int main(int argc, char *argv[]){
 	int verbose = 0;
 	int sockfd;
 	char packet_buffer[ETHER_MAX_LEN+1];
+	uid_t work_uid = 65535; /* nobody */
 	
 	char *packet_data=packet_buffer+sizeof(struct ether_header)+sizeof(u_int16_t);
 	u_int16_t *pdata_len=packet_buffer+sizeof(struct ether_header);
@@ -51,6 +52,7 @@ int main(int argc, char *argv[]){
                    {"mac", required_argument, 0, 'm' },
                    {"verbose", no_argument, 0, 'v' },
                    {"type", no_argument, 0, 't' },
+                   {"uid", required_argument, 0, 'u' },
                    {"help", no_argument, 0, 'h' },
                    {0, 0, 0, 0 }
 	        };
@@ -80,6 +82,9 @@ int main(int argc, char *argv[]){
 			break;
 		case 'v':
 			verbose++;
+			break;
+		case 'u':
+			work_uid=atoi(optarg);
 			break;
 		case 'h':
 			print_help(argv[0]);
@@ -114,6 +119,9 @@ int main(int argc, char *argv[]){
             perror("SIOCGIFHWADDR");
             exit(6);
 	}
+	
+	/* drop privilegies */
+	setuid(work_uid);
 
         /* Construct the Ethernet header */
         memset(packet_buffer, 0, ETH_FRAME_LEN);
