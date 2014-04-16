@@ -8,9 +8,21 @@
 #include <signal.h>
 #include "logging.h"
 #include "ether.h"
-
+#include <signal.h>
 
 void print_help(char *);
+
+pid_t pid=0;
+
+/* log signal number, kill receiver and exit */
+
+static void sig_handler(int sig, siginfo_t *si, void *unused){
+    logit(LOG_NOTICE,"Got signal %d", sig);
+    kill(pid,sig);
+    exit(0);
+}
+
+
 
 int main(int argc, char *argv[]){
 
@@ -28,7 +40,6 @@ int main(int argc, char *argv[]){
 	u_int16_t *pdata_len=packet_buffer+sizeof(struct ether_header);
 	struct ether_header *eh=(struct ether_header *) packet_buffer;
 	struct ether_addr *other_mac=NULL;
-	pid_t pid=0;
 	struct sockaddr_ll socket_address;
 	
 	
@@ -150,8 +161,24 @@ int main(int argc, char *argv[]){
 	}else{
 		/*parent, fork ok, sender*/
 		ssize_t datalen;
+		struct sigaction sigact;
 		
 		logit(LOG_NOTICE,"Start sending in thread %d\n",getpid());
+		
+		/* set signals reaction 
+		 SIGHUP, SIGPIPE, SIGINT - kill receiver and exit */
+		
+		sigemptyset(&sigact.sa_mask);
+		sigact.sa_sigaction = sig_handler;
+
+		
+		if (sigaction(SIGHUP, &sigact, NULL) == -1 || sigaction(SIGPIPE, &sigact, NULL) == -1 
+			|| sigaction(SIGHUP, &sigact, NULL) == -1 ){
+		    /*oops, can't set signal */
+		    perror("sigaction");
+		    kill(pid,SIGTERM);
+		    exit(7);
+		}
 
 		/*read data from stdin*/
 		while( datalen=read(STDIN_FILENO,packet_data,ETH_DATA_LEN-sizeof(u_int16_t))){
@@ -172,6 +199,7 @@ int main(int argc, char *argv[]){
 
 
 }
+
 
 void print_help(char *runname){
 	
