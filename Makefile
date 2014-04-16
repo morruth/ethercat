@@ -1,7 +1,7 @@
 CFLAGS=-c -g
 BINARY=ethcat
 LDFLAGS=-o $(BINARY) -g
-OBJS=ethcat.o ether.o
+OBJS=ethcat.o ether.o logging.o
 
 .c.o:
 	$(CC) $(CFLAGS) $< -o $@
