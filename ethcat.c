@@ -121,7 +121,7 @@ int main(int argc, char *argv[]){
 	}
 	
 	/* drop privilegies */
-	setuid(work_uid);
+	seteuid(work_uid);
 
         /* Construct the Ethernet header */
         memset(packet_buffer, 0, ETH_FRAME_LEN);
