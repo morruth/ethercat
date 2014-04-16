@@ -215,6 +215,8 @@ void print_help(char *runname){
 			Options:\n\
 				--interface|-i Name of used interface (default: %s)\n\
 				--mac|-m Mac address of other end (required)\n\
+				--type|-t ethernet type\n\
+				--uid|-u working uid (default: 65535)\n\
 				--verbose|-v increase verbosity\n\
 				--help|-h This message\n\
 		\n",
