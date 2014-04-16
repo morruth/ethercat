@@ -49,15 +49,15 @@ int main(int argc, char *argv[]){
 		int option_index=0;
 		static struct option long_options[] = {
                    {"interface", required_argument, 0, 'i' },
+                   {"uid", required_argument, 0, 'u' },
                    {"mac", required_argument, 0, 'm' },
                    {"verbose", no_argument, 0, 'v' },
-                   {"type", no_argument, 0, 't' },
-                   {"uid", required_argument, 0, 'u' },
+                   {"type", required_argument, 0, 't' },
                    {"help", no_argument, 0, 'h' },
                    {0, 0, 0, 0 }
 	        };
 
-		c = getopt_long(argc, argv, "i:m:vh",
+		c = getopt_long(argc, argv, "i:m:t:u:vh",
                         long_options, &option_index);
 
                 if (c == -1)
