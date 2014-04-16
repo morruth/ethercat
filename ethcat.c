@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <signal.h>
+#include "logging.h"
 #include "ether.h"
 
 
@@ -58,7 +59,7 @@ int main(int argc, char *argv[]){
 			/* set mac address of other end */
 			other_mac=ether_aton(optarg);
 			if(NULL == other_mac) {
-				fprintf(stderr,"Wrong MAC format <%s>\n",optarg);
+				logit(LOG_ERR,"Wrong MAC format <%s>\n",optarg);
 				exit(2);
 			}
 			break;
@@ -78,7 +79,7 @@ int main(int argc, char *argv[]){
 		}
 	}
 	if(NULL == other_mac) {
-		fprintf(stderr,"No MAC address of other end\n");
+		logit(LOG_ERR,"No MAC address of other end\n");
 		exit(3);
 	}
 
@@ -129,15 +130,12 @@ int main(int argc, char *argv[]){
 	pid=fork();
 	if(pid == 0 ){
 		/* Child, receiver */
-	    if(verbose){
-	        dprintf(STDERR_FILENO,"Start receider thread %d",getpid());
-	    }
+	        logit(LOG_NOTICE,"Start receiver thread %d\n",getpid());
 
 		ssize_t datalen;
 		while( datalen= recvfrom(sockfd,packet_buffer,ETH_DATA_LEN,0,NULL,NULL)){
-			if(verbose){
-			    dprintf(STDERR_FILENO,"%s",dumppacket(packet_buffer,datalen));
-			}
+			logit(LOG_DEBUG,"%s",dumppacket(packet_buffer,datalen));
+
 			if(eh->ether_type==htons(ether_type)){
 			/* need checking of address FIXME */
 				if(ismymac(eh->ether_dhost)&& maceq(eh->ether_shost,other_mac)){
@@ -153,6 +151,8 @@ int main(int argc, char *argv[]){
 		/*parent, fork ok, sender*/
 		ssize_t datalen;
 		
+		logit(LOG_NOTICE,"Start sending in thread %d\n",getpid());
+
 		/*read data from stdin*/
 		while( datalen=read(STDIN_FILENO,packet_data,ETH_DATA_LEN-sizeof(u_int16_t))){
 			if(datalen== -1 ){
@@ -164,6 +164,9 @@ int main(int argc, char *argv[]){
 				    printf("Send failed\n");
 			}
 		}
+
+		logit(LOG_NOTICE,"End of input, finishing\n");
+
 		kill(pid, SIGTERM); 
 	}
 
