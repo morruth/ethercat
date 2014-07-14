@@ -1,3 +1,7 @@
+
+#define _GNU_SOURCE
+#define __USE_GNU
+
 #include <net/if.h>
 #include <stdio.h>
 #include <getopt.h>
@@ -6,27 +10,38 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <signal.h>
+#include <fcntl.h>
+#include <errno.h>
 #include "logging.h"
 #include "ether.h"
-#include <signal.h>
+
+
 
 void print_help(char *);
 
 pid_t pid=0;
+
+char ttyName[IFNAMSIZ+8]="/dev/tty";
+int pseudo_tty=0;
 
 /* log signal number, kill receiver and exit */
 
 static void sig_handler(int sig, siginfo_t *si, void *unused){
     logit(LOG_NOTICE,"Got signal %d", sig);
     kill(pid,sig);
+    if(pseudo_tty){
+	unlink(ttyName);
+    }
     exit(0);
 }
 
 
 
+#define PTYNAMSIZ 12
 int main(int argc, char *argv[]){
 
 	char ifName[IFNAMSIZ]=DEFAULT_ETHER;
+	char ptyName[PTYNAMSIZ+1];
 	u_int16_t ether_type=DEFAULT_ETHER_TYPE;
         struct ifreq if_idx;
         struct ifreq if_mac;
@@ -43,6 +58,9 @@ int main(int argc, char *argv[]){
 	struct ether_addr *other_mac=NULL;
 	struct sockaddr_ll socket_address;
 	
+	int fdin=STDIN_FILENO;
+	int fdout=STDOUT_FILENO;
+	
 	
 	/* Parse commanf line options */
 	while (1) {
@@ -54,10 +72,11 @@ int main(int argc, char *argv[]){
                    {"verbose", no_argument, 0, 'v' },
                    {"type", required_argument, 0, 't' },
                    {"help", no_argument, 0, 'h' },
+                   {"tty", no_argument,0, 'T' },
                    {0, 0, 0, 0 }
 	        };
 
-		c = getopt_long(argc, argv, "i:m:t:u:vh",
+		c = getopt_long(argc, argv, "i:m:t:u:vhT",
                         long_options, &option_index);
 
                 if (c == -1)
@@ -66,7 +85,7 @@ int main(int argc, char *argv[]){
 		switch (c) {
 		case 'i':
 			/* set interface name */
-			strcpy(ifName,optarg);
+			strcpy(ifName,optarg); /*strncpy should be */
 			break;
 		case 'm':
 			/* set mac address of other end */
@@ -89,6 +108,18 @@ int main(int argc, char *argv[]){
 		case 'h':
 			print_help(argv[0]);
 			exit(0);
+		case 'T':
+			strcat(ttyName,ifName);
+			fdin=open("/dev/ptmx",O_RDWR|O_NOCTTY);
+			unlockpt(fdin);/*FIXME! Add check result values*/
+			grantpt(fdin);
+			strncpy(ptyName,ptsname(fdin),PTYNAMSIZ);
+			printf("%s",ptyName);
+			symlink(ptyName,ttyName);
+			fdout=fdin;
+			
+			
+			break;
 		default:
 			printf ("\nUse %s --help for options list\n", argv[0]);
 			exit(1);
@@ -158,7 +189,7 @@ int main(int argc, char *argv[]){
 			if(eh->ether_type==htons(ether_type)){
 			/* need checking of address FIXME */
 				if(ismymac(eh->ether_dhost)&& maceq(eh->ether_shost,other_mac)){
-					write(STDIN_FILENO,packet_data,ntohs(*pdata_len));
+					write(fdout,packet_data,ntohs(*pdata_len));
 				}
 			}
 		}
@@ -189,9 +220,9 @@ int main(int argc, char *argv[]){
 		}
 
 		/*read data from stdin*/
-		while( datalen=read(STDIN_FILENO,packet_data,ETH_DATA_LEN-sizeof(u_int16_t))){
+		while( datalen=read(fdin,packet_data,ETH_DATA_LEN-sizeof(u_int16_t))){
 			if(datalen== -1 ){
-				perror("I/O error from stdin");
+				logit(LOG_ERR,"I/O error %d from stdin",errno);
 			}else{
 			/*send to network*/
 				*pdata_len=htons(datalen);
