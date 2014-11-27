@@ -1,7 +1,7 @@
-CFLAGS=-c -g
+CFLAGS=-c -g -Wall
 BINARY=ethcat
-LDFLAGS=-o $(BINARY) -g
-OBJS=ethcat.o ether.o logging.o
+LDFLAGS=-o $(BINARY)  -g
+OBJS=ethcat.o ether.o logging.o config.o
 
 .c.o:
 	$(CC) $(CFLAGS) $< -o $@
