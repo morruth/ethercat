@@ -12,7 +12,6 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <bsd/unistd.h>
 #include <sys/wait.h>
 #include "logging.h"
 #include "ether.h"
@@ -189,6 +188,8 @@ int main(int argc, char *argv[],char **envp){
 		unlink(ttyName);
 		exit(0);
 	    }
+	    /* daemonize */
+	    daemon(0,0);
 	}
 
 	
