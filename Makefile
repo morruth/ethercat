@@ -1,6 +1,6 @@
 CFLAGS=-c -g -Wall
 BINARY=ethcat
-LDFLAGS=-o $(BINARY)  -g
+LDFLAGS=-o $(BINARY)  -g -ldotconf
 OBJS=ethcat.o ether.o logging.o config.o
 
 .c.o:
