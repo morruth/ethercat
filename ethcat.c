@@ -12,8 +12,11 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <bsd/unistd.h>
+#include <sys/wait.h>
 #include "logging.h"
 #include "ether.h"
+#include "config.h"
 
 
 
@@ -21,8 +24,8 @@ void print_help(char *);
 
 pid_t pid=0;
 
+bool pseudo_tty;
 char ttyName[IFNAMSIZ+8]="/dev/tty";
-int pseudo_tty=0;
 
 /* log signal number, kill receiver and exit */
 
@@ -38,121 +41,159 @@ static void sig_handler(int sig, siginfo_t *si, void *unused){
 
 
 #define PTYNAMSIZ 12
-int main(int argc, char *argv[]){
+int main(int argc, char *argv[],char **envp){
 
-	char ifName[IFNAMSIZ]=DEFAULT_ETHER;
 	char ptyName[PTYNAMSIZ+1];
-	u_int16_t ether_type=DEFAULT_ETHER_TYPE;
         struct ifreq if_idx;
         struct ifreq if_mac;
 	
 	int c,i;
-	int verbose = 0;
 	int sockfd;
 	char packet_buffer[ETHER_MAX_LEN+1];
-	uid_t work_uid = 65535; /* nobody */
 	
 	char *packet_data=packet_buffer+sizeof(struct ether_header)+sizeof(u_int16_t);
-	u_int16_t *pdata_len=packet_buffer+sizeof(struct ether_header);
+	u_int16_t *pdata_len=(u_int16_t *)(packet_buffer+sizeof(struct ether_header));
 	struct ether_header *eh=(struct ether_header *) packet_buffer;
-	struct ether_addr *other_mac=NULL;
 	struct sockaddr_ll socket_address;
+	
+	pid_t dpid;
 	
 	int fdin=STDIN_FILENO;
 	int fdout=STDOUT_FILENO;
 	
+	struct etherconf *config=config_read(NULL);
+/*	setproctitle_init(argc,argv,envp);*/
+	if(config == NULL) { /*errors in config file, use defaults */
+	    config=&defconfig;
+	}
 	
-	/* Parse commanf line options */
+		/* Parse command line options */
 	while (1) {
 		int option_index=0;
 		static struct option long_options[] = {
-                   {"interface", required_argument, 0, 'i' },
-                   {"uid", required_argument, 0, 'u' },
-                   {"mac", required_argument, 0, 'm' },
-                   {"verbose", no_argument, 0, 'v' },
-                   {"type", required_argument, 0, 't' },
-                   {"help", no_argument, 0, 'h' },
-                   {"tty", no_argument,0, 'T' },
-                   {0, 0, 0, 0 }
-	        };
+		   {"interface", required_argument, 0, 'i' },
+		   {"uid", required_argument, 0, 'u' },
+		   {"mac", required_argument, 0, 'm' },
+		   {"verbose", no_argument, 0, 'v' },
+		   {"type", required_argument, 0, 't' },
+		   {"help", no_argument, 0, 'h' },
+		   {"tty", no_argument,0, 'T' },
+		   {"section", required_argument,0,'S'},
+		   {0, 0, 0, 0 }
+		};
 
-		c = getopt_long(argc, argv, "i:m:t:u:vhT",
-                        long_options, &option_index);
+		c = getopt_long(argc, argv, "i:m:t:u:vhTS:",
+			long_options, &option_index);
 
-                if (c == -1)
-                   break;
+		if (c == -1)
+		   break;
 
-		switch (c) {
-		case 'i':
-			/* set interface name */
-			strcpy(ifName,optarg); /*strncpy should be */
-			break;
-		case 'm':
-			/* set mac address of other end */
-			other_mac=ether_aton(optarg);
-			if(NULL == other_mac) {
-				logit(LOG_ERR,"Wrong MAC format <%s>\n",optarg);
-				exit(2);
+		if (!getuid()){ /* Use this command-line options ONLY if runned by root */
+			switch (c) {
+			case 'i':
+				/* set interface name */
+				config->iface=malloc(strlen(optarg)+1);
+				strcpy(config->iface,optarg);
+				break;
+			case 'm':
+				/* set mac address of other end */
+				config->mac=ether_aton(optarg);
+				if(NULL == config->mac) {
+					logit(LOG_ERR,"Wrong MAC format <%s>\n",optarg);
+					exit(2);
+				}
+				break;
+			case 't':
+				/* set ethernet type of packet */
+				sscanf(optarg,"%04hx",&config->ether_type);
+				break;
+			case 'v':
+				config->verbose++;
+				break;
+			case 'u':
+				config->work_uid=atoi(optarg);
+				break;
+			case 'h':
+				print_help(argv[0]);
+				exit(0);
+			case 'T':
+				pseudo_tty=config->pseudo_tty=1;
+				break;
+			case 'S':
+				config=config_section(optarg);
+				break;
+			default:
+				printf ("\nUse %s --help for options list\n", argv[0]);
+				exit(1);
 			}
-			break;
-		case 't':
-			/* set ethernet type of packet */
-			sscanf(optarg,"%04hx",&ether_type);
-			break;
-		case 'v':
-			verbose++;
-			break;
-		case 'u':
-			work_uid=atoi(optarg);
-			break;
-		case 'h':
-			print_help(argv[0]);
-			exit(0);
-		case 'T':
-			strcat(ttyName,ifName);
-			fdin=open("/dev/ptmx",O_RDWR|O_NOCTTY);
-			unlockpt(fdin);/*FIXME! Add check result values*/
-			grantpt(fdin);
-			strncpy(ptyName,ptsname(fdin),PTYNAMSIZ);
-			printf("%s",ptyName);
-			symlink(ptyName,ttyName);
-			fdout=fdin;
-			
-			
-			break;
-		default:
-			printf ("\nUse %s --help for options list\n", argv[0]);
-			exit(1);
+		} else { /* non-root users can ONLY select section from config file */
+			if(c != 'S') {
+				print_help (argv[0]);
+				exit(1);
+			} else {
+				config=config_section(optarg);
+				if( config == NULL){
+				    printf("\nWrong section name\n");
+				    exit(1);
+				}
+			}
 		}
 	}
-	if(NULL == other_mac) {
+	if(NULL == config->mac) {
 		logit(LOG_ERR,"No MAC address of other end\n");
 		exit(3);
 	}
 
         /* Open RAW socket to send on */
-        if ((sockfd = socket(AF_PACKET, SOCK_RAW, htons(ether_type))) == -1) {
+        if ((sockfd = socket(AF_PACKET, SOCK_RAW, htons(config->ether_type))) == -1) {
             perror("socket");
 	    exit(4);
         }
 
         /* Get the index of the interface to send on */
         memset(&if_idx, 0, sizeof(struct ifreq));
-        strncpy(if_idx.ifr_name, ifName, IFNAMSIZ-1);
+        strncpy(if_idx.ifr_name, config->iface, IFNAMSIZ-1);
         if (ioctl(sockfd, SIOCGIFINDEX, &if_idx) < 0){
             perror("SIOCGIFINDEX");
 	    exit(5);
 	}
         /* Get the MAC address of the interface to send on */
         memset(&if_mac, 0, sizeof(struct ifreq));
-        strncpy(if_mac.ifr_name, ifName, IFNAMSIZ-1);
+        strncpy(if_mac.ifr_name, config->iface, IFNAMSIZ-1);
         if (ioctl(sockfd, SIOCGIFHWADDR, &if_mac) < 0){
             perror("SIOCGIFHWADDR");
             exit(6);
 	}
+
+	/*set pseudotty if needed */
+	
+	if(config->pseudo_tty){
+	    strncat(ttyName,config->iface,IFNAMSIZ);
+	    fdin=open("/dev/ptmx",O_RDWR|O_NOCTTY);
+	    unlockpt(fdin);/*FIXME! Add check result values*/
+	    strncpy(ptyName,ptsname(fdin),PTYNAMSIZ);
+	    if (config->verbose) logit(LOG_DEBUG,"%s\n",ptyName);
+	    fchown(fdin,config->owner,config->group);
+	    fchmod(fdin,config->rights);
+
+	    symlink(ptsname(fdin),ttyName);
+	    fdout=fdin;
+	    if((dpid =fork()) != 0){
+		/*parent or error */
+		if( dpid == -1 ){
+		    perror("Fork failed");
+		    exit(1);
+		}
+		/*setproctitle("%s control",ifName);*/
+		waitpid(dpid, NULL, 0);
+		unlink(ttyName);
+		exit(0);
+	    }
+	}
+
 	
 	/* drop privilegies */
-	seteuid(work_uid);
+	seteuid(config->work_uid);
 
         /* Construct the Ethernet header */
         memset(packet_buffer, 0, ETH_FRAME_LEN);
@@ -165,11 +206,11 @@ int main(int argc, char *argv[]){
 	}
 
 	/* Destination MAC */
-	memcpy(eh->ether_dhost,other_mac,ETH_ALEN);
-	memcpy(&socket_address.sll_addr,other_mac,ETH_ALEN);
+	memcpy(eh->ether_dhost,config->mac,ETH_ALEN);
+	memcpy(&socket_address.sll_addr,config->mac,ETH_ALEN);
 
         /* Ethertype field */
-        eh->ether_type = htons(ether_type);
+        eh->ether_type = htons(config->ether_type);
 
 	/* Index of the network device */
         socket_address.sll_ifindex = if_idx.ifr_ifindex;
@@ -181,14 +222,15 @@ int main(int argc, char *argv[]){
 	if(pid == 0 ){
 		/* Child, receiver */
 	        logit(LOG_NOTICE,"Start receiver thread %d\n",getpid());
+		/*setproctitle("%s receiver",ifName);*/
 
 		ssize_t datalen;
-		while( datalen= recvfrom(sockfd,packet_buffer,ETH_DATA_LEN,0,NULL,NULL)){
+		while( (datalen= recvfrom(sockfd,packet_buffer,ETH_DATA_LEN,0,NULL,NULL)) ){
 			logit(LOG_DEBUG,"%s",dumppacket(packet_buffer,datalen));
 
-			if(eh->ether_type==htons(ether_type)){
+			if(eh->ether_type==htons(config->ether_type)){
 			/* need checking of address FIXME */
-				if(ismymac(eh->ether_dhost)&& maceq(eh->ether_shost,other_mac)){
+				if(ismymac(eh->ether_dhost)&& maceq(eh->ether_shost,config->mac)){
 					write(fdout,packet_data,ntohs(*pdata_len));
 				}
 			}
@@ -203,6 +245,8 @@ int main(int argc, char *argv[]){
 		struct sigaction sigact;
 		
 		logit(LOG_NOTICE,"Start sending in thread %d\n",getpid());
+		/*setproctitle("%s sender",ifName);*/
+
 		
 		/* set signals reaction 
 		 SIGHUP, SIGPIPE, SIGINT - kill receiver and exit */
@@ -220,9 +264,13 @@ int main(int argc, char *argv[]){
 		}
 
 		/*read data from stdin*/
-		while( datalen=read(fdin,packet_data,ETH_DATA_LEN-sizeof(u_int16_t))){
+		while( ( datalen=read(fdin,packet_data,ETH_DATA_LEN-sizeof(u_int16_t)) ) ){
 			if(datalen== -1 ){
-				logit(LOG_ERR,"I/O error %d from stdin",errno);
+				if(config->pseudo_tty && errno == EIO){ /*PTY was closed */
+					sleep(1);
+				}else{
+					logit(LOG_ERR,"I/O error %d from stdin",errno);
+				}
 			}else{
 			/*send to network*/
 				*pdata_len=htons(datalen);
@@ -236,7 +284,7 @@ int main(int argc, char *argv[]){
 		kill(pid, SIGTERM); 
 	}
 
-
+return 0;
 }
 
 
