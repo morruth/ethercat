@@ -53,10 +53,10 @@ int ismymac( const unsigned char *mac){
 
 int maceq(const void *mac1, const void *mac2){
     unsigned char *bytep1=(unsigned char*)mac1,*bytep2=(unsigned char *)mac2;
-    for(;*bytep1 == *bytep2 && (void *)bytep1-mac1 < ETH_ALEN ; bytep1++){
+    for(;*bytep1 == *bytep2 && bytep1-(unsigned char*)mac1 < ETH_ALEN ; bytep1++){
 	bytep2++;
     }
-    return (bytep1 != mac1);
+    return (bytep1 != (unsigned char *)mac1);
 }
 
 char *dumppacket( void *packet, int packet_len){
@@ -66,7 +66,8 @@ char *dumppacket( void *packet, int packet_len){
     sprintf(printbuf,"%s -> %s, type: %02x length: %hd\n%s",
             ether_ntoa((struct ether_addr *)eh->ether_shost),
             ether_ntoa((struct ether_addr *)eh->ether_dhost), 
-            ntohs(eh->ether_type),ntohs(*(u_int16_t *)(packet+ETHER_HDR_LEN)), hexdump(packet+ETHER_HDR_LEN+sizeof(u_int16_t),
+            ntohs(eh->ether_type),ntohs(*(u_int16_t *)((u_int8_t *)packet+ETHER_HDR_LEN)),
+            hexdump((u_int8_t *)packet+ETHER_HDR_LEN+sizeof(u_int16_t),
 	    packet_len - ETHER_HDR_LEN));
     return printbuf;
 }
