@@ -14,4 +14,5 @@ void logit(int level, char* format, ... ){
     if(level<=log_level){
         vdprintf(log_fd,format, argptr);
     }
+    va_end(argptr);
 }
