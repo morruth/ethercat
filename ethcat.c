@@ -42,11 +42,10 @@ static void sig_handler(int sig, siginfo_t *si, void *unused){
 #define PTYNAMSIZ 12
 int main(int argc, char *argv[],char **envp){
 
-	char ptyName[PTYNAMSIZ+1];
         struct ifreq if_idx;
         struct ifreq if_mac;
 	
-	int c,i;
+	int i;
 	int sockfd;
 	char packet_buffer[ETHER_MAX_LEN+1];
 	
@@ -69,6 +68,7 @@ int main(int argc, char *argv[],char **envp){
 		/* Parse command line options */
 	while (1) {
 		int option_index=0;
+		int c;
 		static struct option long_options[] = {
 		   {"interface", required_argument, 0, 'i' },
 		   {"uid", required_argument, 0, 'u' },
@@ -167,6 +167,8 @@ int main(int argc, char *argv[],char **envp){
 	/*set pseudotty if needed */
 	
 	if(config->pseudo_tty){
+	    char ptyName[PTYNAMSIZ+1];
+
 	    strncat(ttyName,config->iface,IFNAMSIZ);
 	    fdin=open("/dev/ptmx",O_RDWR|O_NOCTTY);
 	    unlockpt(fdin);/*FIXME! Add check result values*/
