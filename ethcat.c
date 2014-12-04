@@ -173,10 +173,10 @@ int main(int argc, char *argv[],char **envp){
 	    unlockpt(fdin);/*FIXME! Add check result values*/
 	    strncpy(ptyName,ptsname(fdin),PTYNAMSIZ);
 	    if (config->verbose) logit(LOG_DEBUG,"%s\n",ptyName);
-	    fchown(fdin,config->owner,config->group);
-	    fchmod(fdin,config->rights);
+	    chown(ptyName,config->owner,config->group);
+	    chmod(ptyName,config->rights);
 
-	    symlink(ptsname(fdin),ttyName);
+	    symlink(ptyName,ttyName);
 	    fdout=fdin;
 	    if((dpid =fork()) != 0){
 		/*parent or error */
