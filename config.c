@@ -156,13 +156,10 @@ DOTCONF_CB(cb_section)
 	}
 	sections_idx++;
 	new_configs=realloc(configs,sizeof(struct etherconf)*(sections_idx+1));
-	if( errno == ENOMEM){
+	if( new_configs == NULL){
 		return "Memory allocation for section failed";
 	}
-	if( new_configs != configs ) {
-		free(configs);
-		configs=new_configs;
-	}
+	configs=new_configs;
 	configs[sections_idx]=defconfig;
 	config=configs+sections_idx;
 
