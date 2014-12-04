@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <net/ethernet.h>
+#include <arpa/inet.h>
 
 char *hexdump(void *,int);
 
@@ -61,9 +62,11 @@ int maceq(const void *mac1, const void *mac2){
 char *dumppacket( void *packet, int packet_len){
     static char printbuf[4096]; /* size of buffer enougth? */
     struct ether_header *eh=(struct ether_header*)packet;
-    unsigned char *packet_data;
 
-    sprintf(printbuf,"%s -> %s, type: %02x length: %hd\n%s",ether_ntoa(eh->ether_shost),ether_ntoa(eh->ether_dhost), ntohs(eh->ether_type),ntohs(*(u_int16_t *)(packet+ETHER_HDR_LEN)), hexdump(packet+ETHER_HDR_LEN+sizeof(u_int16_t),
+    sprintf(printbuf,"%s -> %s, type: %02x length: %hd\n%s",
+            ether_ntoa((struct ether_addr *)eh->ether_shost),
+            ether_ntoa((struct ether_addr *)eh->ether_dhost), 
+            ntohs(eh->ether_type),ntohs(*(u_int16_t *)(packet+ETHER_HDR_LEN)), hexdump(packet+ETHER_HDR_LEN+sizeof(u_int16_t),
 	    packet_len - ETHER_HDR_LEN));
     return printbuf;
 }
