@@ -23,3 +23,6 @@ struct ether_addr *ether_aton(const char *);
 
 char *ether_ntoa(const struct ether_addr *);
 char *dumppacket( void *, int );
+int ismymac( const unsigned char *mac);
+int maceq(const void *mac1, const void *mac2);
+
