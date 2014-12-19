@@ -71,7 +71,7 @@ struct etherconf *config_read(char *config_filename){
 struct etherconf *config_section(char *section_name){
 	int i;
 	for(i=0;i<=sections_idx;i++){
-	    if(strcmp(configs[sections_idx].name,section_name) == 0 ){
+	    if(strcmp(configs[i].name,section_name) == 0 ){
 		return configs+i;
 	    }
 	}
@@ -169,6 +169,7 @@ DOTCONF_CB(cb_section)
 DOTCONF_CB(cb_name)
 {
 	config->name=malloc(strlen(cmd->data.str)+1);
+	strcpy(config->name,cmd->data.str);
 
 	return NULL;
 }

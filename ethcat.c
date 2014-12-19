@@ -120,6 +120,10 @@ int main(int argc, char *argv[],char **envp){
 				break;
 			case 'S':
 				config=config_section(optarg);
+				if( config == NULL){
+				    printf("\nWrong section name\n");
+				    exit(1);
+				}
 				break;
 			default:
 				printf ("\nUse %s --help for options list\n", argv[0]);
