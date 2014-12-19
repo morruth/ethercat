@@ -183,6 +183,8 @@ int main(int argc, char *argv[],char **envp){
 
 	    symlink(ptyName,ttyName);
 	    fdout=fdin;
+	    /* daemonize */
+	    daemon(0,0);
 	    if((dpid =fork()) != 0){
 		/*parent or error */
 		if( dpid == -1 ){
@@ -194,8 +196,6 @@ int main(int argc, char *argv[],char **envp){
 		unlink(ttyName);
 		exit(0);
 	    }
-	    /* daemonize */
-	    daemon(0,0);
 	}
 
 	
